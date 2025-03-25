@@ -5,6 +5,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from typing import Optional
 import json
 import uvicorn
+from alembic.config import Config
+from alembic import command
 
 
 from src.schemas import *
@@ -98,10 +100,6 @@ async def update_lesson_data(index: int, data_index: int, lesson_data: str = For
 async def delete_lesson_data(index: int, data_index: int):
     return await ORM.delete_lesson_data(data_index)
 
-
-if __name__ == '__main__':
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
-
 @app.get("/image/{filename}")
 async def get_image(filename: str):
     fs = Filesystem()
@@ -116,3 +114,16 @@ async def get_array(filename: str, offset: int = 1, limit: int = 100):
 async def get_matrix(filename: str, page_row: int = 1, limit_row: int = 10, page_col: int = 1, limit_col: int = 10):
     fs = Filesystem()
     return fs.get_matrix(filename, page_row, limit_row, page_col, limit_col)
+
+@app.get("/audio")
+async def get_audio(filename: str):
+    import src.data_generator as dg
+    dg.GenerateRandomArray(10, 1, 2, filename)
+
+def run_migrations():
+    alembic_cfg = Config("alembic.ini")
+    command.upgrade(alembic_cfg, "head")
+
+if __name__ == '__main__':
+    run_migrations()
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

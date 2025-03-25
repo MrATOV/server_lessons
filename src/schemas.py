@@ -3,6 +3,7 @@ from src.database.models import LessonDataType, UserRole
 from pydantic import BaseModel, field_validator
 import hashlib
 
+
 class UserListDTO(BaseModel):
     username: str
     email: str

@@ -1,7 +1,12 @@
 import ctypes
 import os
 
-lib = ctypes.CDLL(os.path.abspath("./.lib/libDataGenerator.so"))
+
+lib_dir = 'lib'
+lib_filename = 'libDataGenerator.so'
+path = os.path.join(os.getcwd(), lib_dir, lib_filename)
+print(path)
+lib = ctypes.CDLL(path)
 
 lib.GenerateArrayFileInt.argtypes = [ctypes.c_size_t, ctypes.c_int, ctypes.c_int, ctypes.c_char_p]
 lib.GenerateMatrixFileInt.argtypes = [ctypes.c_size_t, ctypes.c_size_t, ctypes.c_int, ctypes.c_int, ctypes.c_char_p]
@@ -23,18 +28,22 @@ lib.GenerateMatrixFileULong.argtypes = [ctypes.c_size_t, ctypes.c_size_t, ctypes
 
 lib.GenerateTextFile.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 
-lib.GenerateArrayFileInt(10, 0, 100, b"output_int_array.array")
-lib.GenerateArrayFileUInt(10, 0, 100, b"output_uint_array.array")
-lib.GenerateArrayFileDouble(10, 0.0, 100.0, b"output_double_array.array")
-lib.GenerateArrayFileFloat(10, 0.0, 100.0, b"output_float_array.array")
-lib.GenerateArrayFileLong(10, 0, 100, b"output_long_array.array")
-lib.GenerateArrayFileULong(10, 0, 100, b"output_ulong_array.array")
+def GenerateRandomArray(size, min, max, file_path):
+    lib.GenerateArrayFileInt(size, min, max, file_path.encode())
 
-lib.GenerateMatrixFileInt(5, 5, 0, 100, b"output_int_matrix.matrix")
-lib.GenerateMatrixFileUInt(5, 5, 0, 100, b"output_uint_matrix.matrix")
-lib.GenerateMatrixFileDouble(5, 5, 0.0, 100.0, b"output_double_matrix.matrix")
-lib.GenerateMatrixFileFloat(5, 5, 0.0, 100.0, b"output_float_matrix.matrix")
-lib.GenerateMatrixFileLong(5, 5, 0, 100, b"output_long_matrix.matrix")
-lib.GenerateMatrixFileULong(5, 5, 0, 100, b"output_ulong_matrix.matrix")
 
-lib.GenerateTextFile(b"Hello, World!", b"output_ulong_matrix.txt")
+# lib.GenerateArrayFileInt(10, 0, 100, b"output_int_array.array")
+# lib.GenerateArrayFileUInt(10, 0, 100, b"output_uint_array.array")
+# lib.GenerateArrayFileDouble(10, 0.0, 100.0, b"output_double_array.array")
+# lib.GenerateArrayFileFloat(10, 0.0, 100.0, b"output_float_array.array")
+# lib.GenerateArrayFileLong(10, 0, 100, b"output_long_array.array")
+# lib.GenerateArrayFileULong(10, 0, 100, b"output_ulong_array.array")
+
+# lib.GenerateMatrixFileInt(5, 5, 0, 100, b"output_int_matrix.matrix")
+# lib.GenerateMatrixFileUInt(5, 5, 0, 100, b"output_uint_matrix.matrix")
+# lib.GenerateMatrixFileDouble(5, 5, 0.0, 100.0, b"output_double_matrix.matrix")
+# lib.GenerateMatrixFileFloat(5, 5, 0.0, 100.0, b"output_float_matrix.matrix")
+# lib.GenerateMatrixFileLong(5, 5, 0, 100, b"output_long_matrix.matrix")
+# lib.GenerateMatrixFileULong(5, 5, 0, 100, b"output_ulong_matrix.matrix")
+
+# lib.GenerateTextFile(b"Hello, World!", b"output_ulong_matrix.txt")
