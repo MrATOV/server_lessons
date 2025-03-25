@@ -1,8 +1,41 @@
 from datetime import datetime
 from src.database.models import LessonDataType, UserRole
+from src.data_generator import DataType, FillType
 from pydantic import BaseModel, field_validator
 import hashlib
+from typing import Optional, Union
 
+class GenerateDataTypeDTO(BaseModel):
+    dataType: DataType
+    filename: str
+
+class RandomDTO(GenerateDataTypeDTO):
+    min: Union[int, float]
+    max: Union[int, float]
+
+class OrderDTO(GenerateDataTypeDTO):
+    fillType: FillType
+    start: Union[int, float]
+    step: Union[int, float]
+    interval: int
+
+class RandomArrayDTO(RandomDTO):
+    size: int
+
+class OrderArrayDTO(OrderDTO):
+    size: int
+
+class RandomMatrixDTO(RandomDTO):
+    rows: int
+    cols: int
+
+class OrderMatrixDTO(OrderDTO):
+    rows: int
+    cols: int
+    
+class TextDTO(BaseModel):
+    text: str
+    filename: str
 
 class UserListDTO(BaseModel):
     username: str

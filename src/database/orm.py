@@ -7,7 +7,7 @@ from datetime import datetime
 from src.database.core import session
 from src.database.models import *
 from src.schemas import *
-from src.filesystem import Filesystem
+#from src.filesystem import Filesystem
 
 
 async def insert_user(userDTO: UserListDTO):
@@ -110,15 +110,15 @@ async def delete_lesson_data(data_index: int):
             lesson_data = result.scalars().first()
             if lesson_data is None:
                 raise HTTPException(status_code=404, detail="Lesson data not found")
-            if (lesson_data.type == 'image' and not lesson_data.content.startswith("http")):
-                filename = lesson_data.content
-                fs = Filesystem()
-                fs.delete_image(filename)
+            result = {'message': 'Lesson data deleting successfully'}
+            if (lesson_data.type in (LessonDataType.IMAGE, LessonDataType.AUDIO, LessonDataType.VIDEO) and not lesson_data.content.startswith("http")):
+                result['delete_file'] = lesson_data.content
+                
 
             query = delete(LessonData).filter(LessonData.id == data_index)
             await s.execute(query)
             await s.commit()
-            return {'message': 'Lesson data deleting successfully'}
+            return result
     except:
         s.rollback()
         raise HTTPException(status_code=500, detail='Error deleting lesson data')
@@ -132,9 +132,7 @@ async def update_lesson_data(lesson_data: LessonDataUpdateDTO, lesson_id: int, i
             
             result = {'message': 'Lesson data updating successfully'}
             if data.type == 'image' and not lesson_data.content.startswith("http") and data.content != lesson_data.content:
-                filename = data.content
-                fs = Filesystem()
-                fs.delete_image(filename)
+                result["delete_file"] = data.content
                 result["filename"] = lesson_data.content
             
             data.order = lesson_data.order
