@@ -1,5 +1,5 @@
 from datetime import datetime
-from src.database.models import LessonDataType, UserRole
+from src.database.models import LessonDataType, UserRole, TestDataType
 from src.data_generator import DataType, FillType
 from pydantic import BaseModel, field_validator
 import hashlib
@@ -49,6 +49,14 @@ class UserListDTO(BaseModel):
         return hash_object.hexdigest()
 
 
+class TestListReadDTO(BaseModel):
+    id: int
+    title: str
+    storage_key: str
+
+    class Config:
+        from_attributes = True
+
 class UserListReadDTO(BaseModel):
     id: int
     username: str
@@ -86,6 +94,15 @@ class LessonDataUpdateDTO(LessonDataDTO):
 
 class LessonDataReadDTO(LessonDataUpdateDTO):
     lesson_id: int
+
+    class Config:
+        from_attributes = True
+
+class DefaultDataDTO(BaseModel):
+    id: int
+    type: TestDataType
+    path: str
+    user_id: int
 
     class Config:
         from_attributes = True

@@ -53,17 +53,41 @@ class S3Client:
                 ]
             }
             
-            
-            
             self.client.put_bucket_policy(
                 Bucket=self.public_bucket,
                 Policy=json.dumps(public_policy)
             )
 
+    def _generate_unique_filename(self, bucket: str, prefix: str, filename: str) -> str:
+        """
+        Генерирует уникальное имя файла, добавляя суффикс, если файл уже существует.
+        """
+        base, ext = os.path.splitext(filename)
+        counter = 1
+        new_filename = filename
+        
+        while True:
+            try:
+                # Проверяем существование файла
+                self.client.head_object(Bucket=bucket, Key=f"{prefix}/{new_filename}")
+                # Если файл существует, добавляем суффикс
+                new_filename = f"{base}_{counter}{ext}"
+                counter += 1
+            except:
+                # Файл не существует, можно использовать это имя
+                return new_filename
+
     async def upload_media_file(self, file, file_type: str, lesson_id: str):
         try:
-            filename = generate_file_token(32) + '.' + file.filename.split('.')[-1]
-            s3_key = f"{file_type}/{lesson_id}/{filename}"
+            # Генерируем уникальное имя файла
+            original_filename = file.filename.split('/')[-1]  # На случай, если в имени есть путь
+            unique_filename = self._generate_unique_filename(
+                self.public_bucket,
+                f"{file_type}/{lesson_id}",
+                original_filename
+            )
+            
+            s3_key = f"{file_type}/{lesson_id}/{unique_filename}"
             self.client.upload_fileobj(
                 file.file,
                 self.public_bucket,
@@ -92,11 +116,36 @@ class S3Client:
             )
         except Exception as e:
             raise HTTPException(500, f'Error deleting file: {e}')
-        
+    
+    def upload_file_private(self, file, user_id: str):
+        try:
+            original_filename = file.filename.split('/')[-1]
+            unique_filename = self._generate_unique_filename(
+                self.private_bucket,
+                user_id,
+                original_filename
+            )
+            
+            s3_key = f'{user_id}/{unique_filename}'
+            self.client.upload_fileobj(
+                file.file,
+                self.private_bucket,
+                s3_key
+            )
+            return s3_key
+        except Exception as e:
+            raise HTTPException(500, f"Error uploading file: {e}")
+
     def upload_file_from_path(self, file_path: str, user_id: str):
         try:
             file_name = os.path.basename(file_path)
-            s3_key = f"{user_id}/{file_name}"
+            unique_filename = self._generate_unique_filename(
+                self.private_bucket,
+                user_id,
+                file_name
+            )
+            
+            s3_key = f"{user_id}/{unique_filename}"
             
             self.client.upload_file(
                 file_path,
