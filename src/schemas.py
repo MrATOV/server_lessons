@@ -1,7 +1,7 @@
 from datetime import datetime
 from src.database.models import LessonDataType, UserRole, TestDataType
 from src.data_generator import DataType, FillType
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, EmailStr
 import hashlib
 from typing import Optional, Union
 
@@ -53,6 +53,7 @@ class TestListReadDTO(BaseModel):
     id: int
     title: str
     storage_key: str
+    date: datetime
 
     class Config:
         from_attributes = True
@@ -74,6 +75,8 @@ class UserListReadDTO(BaseModel):
 
 class LessonListDTO(BaseModel):
     title: str
+    private_access: bool
+    description: str
 
 class LessonListReadDTO(LessonListDTO):
     id: int
@@ -106,3 +109,39 @@ class DefaultDataDTO(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SourceCodeDTO(BaseModel):
+    id: int
+    path: str
+    user_id: int
+
+    class Config:
+        from_attributes = True
+
+class NotificationDTO(BaseModel):
+    user_id: int
+    text: str
+
+class NotificationWriteDTO(NotificationDTO):
+    task_id: str
+
+class NotificationsDTO(NotificationDTO):
+    id: int
+    is_read: bool
+
+    class Config:
+        from_attributes = True
+
+class EmailSchema(BaseModel):
+    email_to: EmailStr
+    subject: str
+    body: str
+
+class EmailWithAttachmentSchema(EmailSchema):
+    attachement: bytes
+    filename: str
+
+class BroadcastDTO(BaseModel):
+    token: str
+    user_indices: list[int]
+    lesson_id: int

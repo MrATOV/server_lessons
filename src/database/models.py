@@ -1,5 +1,5 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey, LargeBinary, Enum as SQLAlchemyEnum, String
+from sqlalchemy import ForeignKey, LargeBinary, Enum as SQLAlchemyEnum, String, PrimaryKeyConstraint, CheckConstraint
 from typing import Annotated, Optional
 from datetime import datetime, timezone
 from enum import Enum
@@ -38,15 +38,21 @@ class UserList(Base):
     password: Mapped[str_nn]
     role: Mapped[UserRole] = mapped_column(SQLAlchemyEnum(UserRole))
 
+    lessons = relationship("LessonList", secondary="user_lesson", back_populates="users")
+
 class LessonList(Base):
     __tablename__ = 'lesson_list'
 
     id: Mapped[int_pk]
     title: Mapped[str_nn]
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    private_access: Mapped[bool] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(default=datetime.now())
     updated_at: Mapped[datetime] = mapped_column(default=datetime.now(), onupdate=datetime.now())
     user_id: Mapped[int] = mapped_column(ForeignKey("user_list.id", ondelete='CASCADE'))
     
+    users = relationship("UserList", secondary="user_lesson", back_populates="lessons")
+
 class LessonData(Base):
     __tablename__ = 'lesson_data'
 
@@ -58,9 +64,27 @@ class LessonData(Base):
 
 class UserLesson(Base):
     __tablename__ = 'user_lesson'
-    id: Mapped[int_pk]
     user_id: Mapped[int] = mapped_column(ForeignKey("user_list.id", ondelete='CASCADE'))
     lesson_id: Mapped[int] = mapped_column(ForeignKey("lesson_list.id", ondelete='CASCADE'))
+
+    __table_args__ = (
+        PrimaryKeyConstraint('user_id', 'lesson_id'),
+    )
+
+class SourceCode(Base):
+    __tablename__ = 'source_code'
+
+    id: Mapped[int_pk]
+    path: Mapped[str_nn]
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_list.id", ondelete='CASCADE'))
+
+class Notifications(Base):
+    __tablename__ = 'notifications'
+
+    id: Mapped[int_pk]
+    text: Mapped[str_nn]
+    is_read: Mapped[bool] = mapped_column(default=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_list.id", ondelete='CASCADE'))
 
 class DefaultData(Base):
     __tablename__ = 'default_data'
@@ -109,8 +133,8 @@ class DataArguments(Base):
     id: Mapped[int_pk]
     args_id: Mapped[int] = mapped_column(ForeignKey("arguments_list.id", ondelete='CASCADE'))
     data_id: Mapped[int] = mapped_column(ForeignKey("data_list.id", ondelete='CASCADE'))
-    processing_data: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    processing_data: Mapped["ProcessingData | None"] = relationship(back_populates="data_arguments")
     arguments = relationship("ArgumentsList", back_populates="data_associations")
     data = relationship("DataList", back_populates="arguments")
     performance_values = relationship("PerformanceValues", back_populates="data_argument", cascade="all, delete")
@@ -124,7 +148,34 @@ class PerformanceValues(Base):
     acceleration: Mapped[float] = mapped_column()
     efficiency: Mapped[float] = mapped_column()
     cost: Mapped[float] = mapped_column()
-    processing_data: Mapped[str | None] = mapped_column(String, nullable=True)
     data_arguments_id: Mapped[int] = mapped_column(ForeignKey("data_arguments.id", ondelete='CASCADE'))
 
+    processing_data: Mapped["ProcessingData | None"] = relationship(back_populates="performance_values")
     data_argument = relationship("DataArguments", back_populates="performance_values")
+
+class ProcessingData(Base):
+    __tablename__ = 'processing_data'
+
+    id: Mapped[int_pk]
+    type: Mapped[TestDataType] = mapped_column(SQLAlchemyEnum(TestDataType))
+    path: Mapped[str_nn]
+    
+    data_arguments_id: Mapped[int | None] = mapped_column(
+        ForeignKey("data_arguments.id", ondelete="CASCADE"),
+        nullable=True
+    )
+    data_arguments: Mapped["DataArguments | None"] = relationship(back_populates="processing_data")
+
+    performance_values_id: Mapped[int | None] = mapped_column(
+        ForeignKey("performance_values.id", ondelete="CASCADE"),
+        nullable=True
+    )
+    performance_values: Mapped["PerformanceValues | None"] = relationship(back_populates="processing_data")
+
+    __table_args__ = (
+        CheckConstraint(
+            "(data_arguments_id IS NOT NULL AND performance_values_id IS NULL) OR"
+            "(data_arguments_id IS NULL AND performance_values_id IS NOT NULL)",
+            name="check_comment_reference"
+        ),
+    )

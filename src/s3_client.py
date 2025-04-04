@@ -59,28 +59,21 @@ class S3Client:
             )
 
     def _generate_unique_filename(self, bucket: str, prefix: str, filename: str) -> str:
-        """
-        Генерирует уникальное имя файла, добавляя суффикс, если файл уже существует.
-        """
         base, ext = os.path.splitext(filename)
         counter = 1
         new_filename = filename
         
         while True:
             try:
-                # Проверяем существование файла
                 self.client.head_object(Bucket=bucket, Key=f"{prefix}/{new_filename}")
-                # Если файл существует, добавляем суффикс
                 new_filename = f"{base}_{counter}{ext}"
                 counter += 1
             except:
-                # Файл не существует, можно использовать это имя
                 return new_filename
 
     async def upload_media_file(self, file, file_type: str, lesson_id: str):
         try:
-            # Генерируем уникальное имя файла
-            original_filename = file.filename.split('/')[-1]  # На случай, если в имени есть путь
+            original_filename = file.filename.split('/')[-1] 
             unique_filename = self._generate_unique_filename(
                 self.public_bucket,
                 f"{file_type}/{lesson_id}",
@@ -117,16 +110,56 @@ class S3Client:
         except Exception as e:
             raise HTTPException(500, f'Error deleting file: {e}')
     
-    def upload_file_private(self, file, user_id: str):
+    def create_source_code(self, code: str, filename: str, user_id: str):
+        try:
+            unique_filename = self._generate_unique_filename(
+                self.private_bucket,
+                f"{user_id}/code",
+                filename
+            )
+
+            s3_key = f'{user_id}/code/{unique_filename}'
+            self.client.put_object(
+                Body=code,
+                Bucket=self.private_bucket,
+                Key=s3_key
+            )
+            return s3_key
+        except Exception as e:
+            raise HTTPException(500, f"Error creating source code: {e}")
+        
+    def put_source_code(self, code: str, filename: str, user_id: str):
+        try:
+            s3_key = f'{user_id}/code/{filename}'
+            self.client.put_object(
+                Body=code,
+                Bucket=self.private_bucket,
+                Key=s3_key
+            )
+        except Exception as e:
+            raise HTTPException(500, f"Error changing source code: {e}")
+        
+    def get_source_code(self, filepath):
+        try:
+            response = self.client.get_object(
+                Bucket=self.private_bucket,
+                Key=filepath
+            )
+            code = response['Body'].read().decode('utf-8')
+            return code
+        except Exception as e:
+            raise HTTPException(500, f"Error getting source code: {e}")
+
+    def upload_file_private(self, type, file, user_id: str):
         try:
             original_filename = file.filename.split('/')[-1]
             unique_filename = self._generate_unique_filename(
                 self.private_bucket,
-                user_id,
+                f"{user_id}/{type}",
                 original_filename
             )
             
-            s3_key = f'{user_id}/{unique_filename}'
+            s3_key = f'{user_id}/{type}/{unique_filename}'
             self.client.upload_fileobj(
                 file.file,
                 self.private_bucket,
@@ -162,8 +195,8 @@ class S3Client:
             except Exception as e:
                 raise HTTPException(500, f"Warning: failed to delete local file {file_path}: {e}")
 
-    def get_temporary_file(self, user_id: str, file_name: str):
-        s3_key = f"{user_id}/{file_name}"
+    def get_temporary_file(self, user_id: str, type: str, file_name: str):
+        s3_key = f"{user_id}/{type}/{file_name}"
         local_file_path = os.path.join(tempfile.gettempdir(), file_name)
 
         try:
