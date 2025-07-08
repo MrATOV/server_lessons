@@ -7,6 +7,7 @@ import json
 import tempfile
 import string
 import random
+import uuid
 
 def generate_file_token(length):
     characters = string.ascii_letters + string.digits
@@ -16,8 +17,7 @@ def generate_file_token(length):
 class S3Client:
     def __init__(self):
         self.endpoint = os.getenv("S3_ENDPOINT")
-        self.public_bucket = os.getenv("S3_PUBLIC_BUCKET")
-        self.private_bucket = os.getenv("S3_PRIVATE_BUCKET")
+        self.bucket = os.getenv("S3_BUCKET")
         self.client = boto3.client(
             's3',
             endpoint_url=self.endpoint,
@@ -28,16 +28,11 @@ class S3Client:
         self._ensure_buckets_exist()
 
     def _ensure_buckets_exist(self):
-        for bucket in [self.private_bucket]:
-            try:
-                self.client.head_bucket(Bucket=bucket)
-            except:
-                self.client.create_bucket(Bucket=bucket)
         try:
-            self.client.head_bucket(Bucket=self.public_bucket)
+            self.client.head_bucket(Bucket=self.bucket)
         except:
             self.client.create_bucket(
-                Bucket=self.public_bucket,
+                Bucket=self.bucket,
                 ACL='public-read'
             )
         
@@ -48,13 +43,13 @@ class S3Client:
                         "Effect": "Allow",
                         "Principal": "*",
                         "Action": ["s3:GetObject"],
-                        "Resource": [f"arn:aws:s3:::{self.public_bucket}/*"]
+                        "Resource": [f"arn:aws:s3:::{self.bucket}/*"]
                     }
                 ]
             }
             
             self.client.put_bucket_policy(
-                Bucket=self.public_bucket,
+                Bucket=self.bucket,
                 Policy=json.dumps(public_policy)
             )
 
@@ -75,7 +70,7 @@ class S3Client:
         try:
             original_filename = file.filename.split('/')[-1] 
             unique_filename = self._generate_unique_filename(
-                self.public_bucket,
+                self.bucket,
                 f"{file_type}/{lesson_id}",
                 original_filename
             )
@@ -83,7 +78,22 @@ class S3Client:
             s3_key = f"{file_type}/{lesson_id}/{unique_filename}"
             self.client.upload_fileobj(
                 file.file,
-                self.public_bucket,
+                self.bucket,
+                s3_key
+            )
+
+            return s3_key
+        except Exception as e:
+            raise HTTPException(500, f"Error uploading file: {e}")
+    
+    async def upload_avatar(self, file):
+        try:
+            type = file.filename.split('.')[-1]
+            
+            s3_key = f"users/{uuid.uuid4()}.{type}"
+            self.client.upload_fileobj(
+                file.file,
+                self.bucket,
                 s3_key
             )
 
@@ -96,111 +106,26 @@ class S3Client:
         local_file_path = os.path.join(tempfile.gettempdir(), file_name)
 
         try:
-            self.client.download_file(self.public_bucket, s3_key, local_file_path)
+            self.client.download_file(self.bucket, s3_key, local_file_path)
+            return local_file_path
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"File not found: {e}")
+    
+    def get_avatar(self, file_name: str):
+        s3_key = f"users/{file_name}"
+        local_file_path = os.path.join(tempfile.gettempdir(), file_name)
+
+        try:
+            self.client.download_file(self.bucket, s3_key, local_file_path)
             return local_file_path
         except Exception as e:
             raise HTTPException(status_code=404, detail=f"File not found: {e}")
         
-    def delete_file(self, s3_key: str, isPublic: bool = True):
+    def delete_file(self, s3_key: str):
         try:
             self.client.delete_object(
-                Bucket=self.public_bucket if isPublic else self.private_bucket,
+                Bucket=self.bucket,
                 Key=s3_key
             )
         except Exception as e:
             raise HTTPException(500, f'Error deleting file: {e}')
-    
-    def create_source_code(self, code: str, filename: str, user_id: str):
-        try:
-            unique_filename = self._generate_unique_filename(
-                self.private_bucket,
-                f"{user_id}/code",
-                filename
-            )
-
-            s3_key = f'{user_id}/code/{unique_filename}'
-            self.client.put_object(
-                Body=code,
-                Bucket=self.private_bucket,
-                Key=s3_key
-            )
-            return s3_key
-        except Exception as e:
-            raise HTTPException(500, f"Error creating source code: {e}")
-        
-    def put_source_code(self, code: str, filename: str, user_id: str):
-        try:
-            s3_key = f'{user_id}/code/{filename}'
-            self.client.put_object(
-                Body=code,
-                Bucket=self.private_bucket,
-                Key=s3_key
-            )
-        except Exception as e:
-            raise HTTPException(500, f"Error changing source code: {e}")
-        
-    def get_source_code(self, filepath):
-        try:
-            response = self.client.get_object(
-                Bucket=self.private_bucket,
-                Key=filepath
-            )
-            code = response['Body'].read().decode('utf-8')
-            return code
-        except Exception as e:
-            raise HTTPException(500, f"Error getting source code: {e}")
-
-    def upload_file_private(self, type, file, user_id: str):
-        try:
-            original_filename = file.filename.split('/')[-1]
-            unique_filename = self._generate_unique_filename(
-                self.private_bucket,
-                f"{user_id}/{type}",
-                original_filename
-            )
-            
-            s3_key = f'{user_id}/{type}/{unique_filename}'
-            self.client.upload_fileobj(
-                file.file,
-                self.private_bucket,
-                s3_key
-            )
-            return s3_key
-        except Exception as e:
-            raise HTTPException(500, f"Error uploading file: {e}")
-
-    def upload_file_from_path(self, file_path: str, user_id: str):
-        try:
-            file_name = os.path.basename(file_path)
-            unique_filename = self._generate_unique_filename(
-                self.private_bucket,
-                user_id,
-                file_name
-            )
-            
-            s3_key = f"{user_id}/{unique_filename}"
-            
-            self.client.upload_file(
-                file_path,
-                self.private_bucket,
-                s3_key
-            )
-            return s3_key
-        except Exception as e:
-            raise HTTPException(500, f"Error uploading file from path: {e}")
-        finally:
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-            except Exception as e:
-                raise HTTPException(500, f"Warning: failed to delete local file {file_path}: {e}")
-
-    def get_temporary_file(self, user_id: str, type: str, file_name: str):
-        s3_key = f"{user_id}/{type}/{file_name}"
-        local_file_path = os.path.join(tempfile.gettempdir(), file_name)
-
-        try:
-            self.client.download_file(self.private_bucket, s3_key, local_file_path)
-            return local_file_path
-        except Exception as e:
-            raise HTTPException(status_code=404, detail=f"Private file not found: {e}")
